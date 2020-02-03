@@ -1,11 +1,20 @@
+from Crypto.Cipher import AES
 import socket
 import select
 import sys
 import threading
 
+def encrypt_msg(msg):
+	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
+	return obj.encrypt(msg)
+
+def decrypt_msg(msg):
+	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
+	return obj.decrypt(msg)
+
 HEADER_LEN = 10
 IP = '127.0.0.1'
-PORT = 1235
+PORT = 1236
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.connect((IP, PORT))
@@ -24,11 +33,11 @@ while True:
 	read_sockets, write_sockets, exception_sockets = select.select(sockets_list, [], sockets_list)
 	for read in read_sockets:
 		if read == server:
-			message = read.recv(2048).decode()
-			print(message)
+			message = read.recv(2048)
+			print(decrypt_msg(message).decode())
 		else:
 			message = sys.stdin.readline()
-			server.send(message.encode())
+			server.send(encrypt_msg(message))
 			#sys.stdout.flush()
 			sys.stdout.write("<You>")
 			sys.stdout.write(message)

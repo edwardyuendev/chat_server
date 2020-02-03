@@ -1,11 +1,21 @@
+from Crypto.Cipher import AES
 import socket
 import select
 import sys
 import threading
 
+
+def encrypt_msg(msg):
+	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
+	return obj.encrypt(msg)
+
+def decrypt_msg(msg):
+	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
+	return obj.decrypt(msg)
+
 HEADER_LEN = 10
 IP = '127.0.0.1'
-PORT = 1235
+PORT = 1236
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -20,22 +30,26 @@ def broadcast_global(msg, conn):
 	for client_socket in clients:
 		if client_socket != conn:
 			try:
-				client_socket.send(msg)
+				client_socket.send(encrypt_msg(msg))
 
 			except:
 				client_socket.close()
 				clients.remove(client_socket)
 
 def receive_msg(client_socket, client_addr):
-	client_socket.send("Welcome to our chatroom! Enjoy chatting!".encode())
+	welcome_msg = "Welcome to our chatroom! Enjoy chatting!"
+	client_socket.send(encrypt_msg(welcome_msg))
+
 	while True:
 		try:
 			#print("waiting for message")
-			message = client_socket.recv(2048).decode()
-			if message:
-				msg = "<" + client_addr[0] + ">" + message
+			message = client_socket.recv(2048)
+			msg = decrypt_msg(message).decode()
+
+			if len(msg) > 0:
+				msg = "<" + client_addr[0] + ">" + msg
 				print("Received message from " + msg)
-				broadcast_global(msg.encode(), client_socket)
+				broadcast_global(msg, client_socket)
 			else:
 				clients.remove(client_socket)
 
@@ -45,7 +59,7 @@ def receive_msg(client_socket, client_addr):
 while True:
 	client_socket, client_addr = server.accept()
 	clients.append(client_socket)
-	print(client_addr[0] + "connected")
+	print(client_addr[0] + " has connected!")
 	thread = threading.Thread(target=receive_msg, args=(client_socket, client_addr))
 	thread.start()
 	#thread.start_new_thread(receive_msg, (client_socket, client_addr))
