@@ -4,14 +4,34 @@ import select
 import sys
 import threading
 
+def send_file(filename, s) #, clients):
+	try:
+		f = open(filename,'rb')
+		f.close()
+	except FileNotFoundError:
+		print("The requested file does not exist.")
+		continue
+	#for user in client:
+	with open(str(filename), 'rb') as sendingFile:
+		packet = sendingFile.read(1024)
+		while (packet):
+			s.send(packet) #user.send(packet)
+			packet = f.read(1024)
+
+def recv_file(filename, s):
+	with open(str(filename), 'wb') as f:
+		while True:
+			packet = s.recv(1024)
+			while (packet):
+				f.write(data)
 
 def encrypt_msg(msg):
-	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
-	return obj.encrypt(msg)
+	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))
+	return obj.encrypt(msg.encode('utf-8'))
 
 def decrypt_msg(msg):
-	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
-	return obj.decrypt(msg)
+	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))
+	return obj.decrypt(msg.encode('utf-8'))
 
 HEADER_LEN = 10
 IP = '127.0.0.1'
