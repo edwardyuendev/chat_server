@@ -61,6 +61,10 @@ while True:
 			#sys.stdout.flush()
 			sys.stdout.write("<You>")
 			sys.stdout.write(message)
+			# if message == "/filetransfer"
+			# 	filename = input("File name:")
+			# 	message = client_socket.send(filename)
+			# 	send_file(filename, server)
 			sys.stdout.flush()
 
 server.close()

@@ -4,7 +4,7 @@ import select
 import sys
 import threading
 
-def send_file(filename, s) #, clients):
+def send_file(filename, s):
 	try:
 		f = open(filename,'rb')
 		f.close()
@@ -75,6 +75,14 @@ def receive_msg(client_socket, client_addr):
 
 		except:
 			continue
+
+		# if msg == "/filetransfer":
+		# 	message = client_socket.recv(2048)
+		# 	recv_file(filename, client_socket)
+		# 	for c in clients
+		# 		send_file(filename, c)
+
+
 
 while True:
 	client_socket, client_addr = server.accept()
