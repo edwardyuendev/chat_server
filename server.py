@@ -10,7 +10,7 @@ def send_file(filename, s):
 		f.close()
 	except FileNotFoundError:
 		print("The requested file does not exist.")
-		continue
+
 	#for user in client:
 	with open(str(filename), 'rb') as sendingFile:
 		packet = sendingFile.read(1024)
@@ -26,12 +26,12 @@ def recv_file(filename, s):
 				f.write(data)
 
 def encrypt_msg(msg):
-	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))
-	return obj.encrypt(msg.encode('utf-8'))
+	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
+	return obj.encrypt(msg)
 
 def decrypt_msg(msg):
-	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))
-	return obj.decrypt(msg.encode('utf-8'))
+	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
+	return obj.decrypt(msg)
 
 HEADER_LEN = 10
 IP = '127.0.0.1'
@@ -75,14 +75,6 @@ def receive_msg(client_socket, client_addr):
 
 		except:
 			continue
-
-		# if msg == "/filetransfer":
-		# 	message = client_socket.recv(2048)
-		# 	recv_file(filename, client_socket)
-		# 	for c in clients
-		# 		send_file(filename, c)
-
-
 
 while True:
 	client_socket, client_addr = server.accept()
