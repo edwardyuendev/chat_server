@@ -5,24 +5,37 @@ import sys
 import threading
 
 def send_file(filename, s):
+	print("Transfering " + filename + "...")
 	try:
 		f = open(filename,'rb')
 		f.close()
 	except FileNotFoundError:
 		print("The requested file does not exist.")
-		continue
-	with open(str(filename), 'rb') as sendingFile:
-		packet = sendingFile.read(1024)
-		while (packet):
-			s.send(packet)
-			packet = f.read(1024)
+		s.send(bytes("~error~","utf-8"))
+	else:
+		s.send(bytes(filename,"utf-8"))
+		s.recv(1024)
+		print("Uploading file to server...")
+		with open(filename,'rb') as f:
+			data = f.read()
+			dataLen = len(data)
+			s.send(dataLen.to_bytes(4,'big'))
+			s.send(data)
+		print(s.recv(1024).decode("utf-8"))
 
 def recv_file(filename, s):
-	with open(str(filename), 'wb') as f:
-		while True:
-			packet = s.recv(1024)
-			while (packet):
-				f.write(data)
+	print("Receiving shared group file...")
+	s.send("/sendFilename") #encrpyt("/sendfile")
+	filename = s.recv(1024).decode("utf-8")
+	s.send("/sendFile")
+	remaining = int.from_bytes(s.recv(4),'big')
+	f = open(filename,"wb")
+	while remaining:
+		data = s.recv(min(remaining,4096))
+		remaining -= len(data)
+		f.write(data)
+	f.close()
+	print("Received file saved as",filename)
 
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))

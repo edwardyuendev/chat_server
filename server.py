@@ -3,6 +3,11 @@ import socket
 import select
 import sys
 import threading
+import requests
+import string
+from lxml import html
+from googlesearch import search
+from bs4 import BeautifulSoup
 
 def send_file(filename, s):
 	try:
@@ -10,7 +15,6 @@ def send_file(filename, s):
 		f.close()
 	except FileNotFoundError:
 		print("The requested file does not exist.")
-		continue
 	#for user in client:
 	with open(str(filename), 'rb') as sendingFile:
 		packet = sendingFile.read(1024)
@@ -32,6 +36,21 @@ def encrypt_msg(msg):
 def decrypt_msg(msg):
 	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))
 	return obj.decrypt(msg.encode('utf-8'))
+
+def chatbot(question):
+	answer = ''
+	text = ''
+	results = list(search(question, tld="co.in", num=10, stop=3, pause=1))
+	soup = BeautifulSoup((requests.get(results[0])).content, features="lxml")
+	for a in soup.findAll('p'):
+		text += '\n' + ''.join(a.findAll(text = True))
+	text = text.replace('\n', '')
+	text = text.split('.')
+	answer = (text[0].split('?')[0]).translate({ord(c): None for c in string.whitespace}) #https://www.journaldev.com/23763/python-remove-spaces-from-string
+	if len(answer) > 0:
+		return answer
+	else:
+		return "I do not know. Ask me something else please."
 
 HEADER_LEN = 10
 IP = '127.0.0.1'
