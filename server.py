@@ -8,26 +8,37 @@ import string
 from lxml import html
 from googlesearch import search
 from bs4 import BeautifulSoup
-
-def send_file(filename, s):
-	try:
-		f = open(filename,'rb')
-		f.close()
-	except FileNotFoundError:
-		print("The requested file does not exist.")
-	#for user in client:
-	with open(str(filename), 'rb') as sendingFile:
-		packet = sendingFile.read(1024)
-		while (packet):
-			s.send(packet) #user.send(packet)
-			packet = f.read(1024)
-
-def recv_file(filename, s):
-	with open(str(filename), 'wb') as f:
-		while True:
-			packet = s.recv(1024)
-			while (packet):
-				f.write(data)
+def transfer_condition(): #elif msg == "/send":
+	with fileTransferCondition:
+		fileTransferCondition.notify()
+		
+def file_transfer(client): 
+	#client.recv(1024).decode("utf-8")
+	client.send(b"/ftc")
+	filename = client.recv(1024).decode("utf-8")
+	if filename == "no_file":
+		continue
+	client.send(b"/sendFile")
+	remaining = int.from_bytes(client.recv(4),'big')
+	f = open(filename,"wb")
+	while remaining:
+		data = client.recv(min(remaining,4096))
+		remaining -= len(data)
+		f.write(data)
+	f.close()
+	print("File received:" + filename)
+	for c in clients:
+		c.send(b"/receiveFile")
+		transfer_condition()
+		c.send(bytes(filename,"utf-8"))
+		transfer_condition()
+		with open(filename,'rb') as f:
+			data = f.read()
+			dataLen = len(data)
+			c.send(dataLen.to_bytes(4,'big'))
+			c.send(data)
+	client.send(bytes(filename + " shared.","utf-8"))
+	print("File sent" + filename)
 
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))
