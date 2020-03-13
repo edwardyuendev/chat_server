@@ -30,7 +30,6 @@ def send_file(s):
 			print("Sending...")
 		f.close()
 	print(s.recv(4096).decode("utf-8"))
-	
 
 def recv_file(s):
 	print("Which file do you want to download? Enter to exit")

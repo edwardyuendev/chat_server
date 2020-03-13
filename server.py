@@ -3,8 +3,6 @@ import socket
 import select
 import sys
 import threading
-import time
-import pickle
 
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
