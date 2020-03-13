@@ -45,6 +45,7 @@ server.listen()
 print("Chat server is now listening: ")
 
 clients = []
+chatrooms = {'Global':[]}
 
 def broadcast_global(msg, conn):
 	for client_socket in clients:
@@ -56,8 +57,21 @@ def broadcast_global(msg, conn):
 				client_socket.close()
 				clients.remove(client_socket)
 
+def broadcast_to_room(msg, conn, room_name):
+	for client_socket in chatrooms[room_name]:
+		if client_socket != conn:
+			try:
+				client_socket.send(encrypt_msg(msg))
+
+			except:
+				client_socket.close()
+				clients.remove(client_socket)
+				chatrooms[room_name].remove(client_socket)
+
 def receive_msg(client_socket, client_addr):
-	welcome_msg = "Welcome to our chatroom! Enjoy chatting!"
+	chatrooms['Global'].append((client_socket))
+	curr_room = 'Global'
+	welcome_msg = """Welcome to our chatroom! Enjoy chatting! You're in chatroom "Global"! """
 	client_socket.send(encrypt_msg(welcome_msg))
 
 	while True:
@@ -66,10 +80,18 @@ def receive_msg(client_socket, client_addr):
 			message = client_socket.recv(2048)
 			msg = decrypt_msg(message).decode()
 
-			if len(msg) > 0:
+			if msg.split()[0] == "/mc":
+				new_room = ' '.join(msg.split()[1:])
+				chatrooms[new_room] = [client_socket]
+				chatrooms[curr_room].remove(client_socket)
+				msg = "<" + client_addr[0] + "> " + """has left chatroom '""" + str(curr_room) + """' and joined chatroom """ + """'""" + str(new_room) + """'!"""
+				print(msg)
+				curr_room = new_room
+				client_socket.send(encrypt_msg("You have created & joined the room called" + """'""" + new_room + """'"""))
+			elif len(msg) > 0:
 				msg = "<" + client_addr[0] + ">" + msg
 				print("Received message from " + msg)
-				broadcast_global(msg, client_socket)
+				broadcast_to_room(msg, client_socket, curr_room)
 			else:
 				clients.remove(client_socket)
 
