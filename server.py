@@ -71,8 +71,9 @@ def broadcast_to_room(msg, conn, room_name):
 def receive_msg(client_socket, client_addr):
 	chatrooms['Global'].append((client_socket))
 	curr_room = 'Global'
-	welcome_msg = """Welcome to our chatroom! Enjoy chatting! You're in chatroom "Global"! """
-	client_socket.send(encrypt_msg(welcome_msg))
+	welcome_msg = """Welcome to our chatroom! \n\n"""
+	help_msg = """Here are a few things you can do: \n1) Type '/mc Edward's Chatroom to create your own chatroom called 'Edward's Chatroom' \n2) Type '/jc Stocks' to join the 'Stocks' chatroom if you know it exists\n3) Type 'Help' at anytime to see these tips again! :) \n \nYou are currently in the chatroom '{0}', you can start sending messages now! \n""".format(curr_room)
+	client_socket.send(encrypt_msg(welcome_msg+help_msg))
 
 	while True:
 		try:
@@ -84,10 +85,23 @@ def receive_msg(client_socket, client_addr):
 				new_room = ' '.join(msg.split()[1:])
 				chatrooms[new_room] = [client_socket]
 				chatrooms[curr_room].remove(client_socket)
-				msg = "<" + client_addr[0] + "> " + """has left chatroom '""" + str(curr_room) + """' and joined chatroom """ + """'""" + str(new_room) + """'!"""
+				msg = "<" + client_addr[0] + "> " + """has left chatroom '""" + str(curr_room) + """' and CREATED chatroom """ + """'""" + str(new_room) + """'!"""
 				print(msg)
 				curr_room = new_room
 				client_socket.send(encrypt_msg("You have created & joined the room called" + """'""" + new_room + """'"""))
+			elif msg.split()[0] == "/jc":
+				new_room = ' '.join(msg.split()[1:])
+				chatrooms[curr_room].remove(client_socket)
+				chatrooms[new_room].append(client_socket)
+				msg = "<" + client_addr[0] + "> " + """has left chatroom '""" + str(curr_room) + """' and JOINED chatroom """ + """'""" + str(new_room) + """'!"""
+				print(msg)
+				client_socket.send(encrypt_msg("""You have left chatroom '""" + str(curr_room) + """' and JOINED chatroom """ + """'""" + str(new_room) + """'!"""))								
+				curr_room = new_room
+			elif msg.split()[0].lower() == "help":
+				msg = "<" + client_addr[0] + "> asked for help"
+				print(msg)
+				client_socket.send(encrypt_msg(help_msg))
+
 			elif len(msg) > 0:
 				msg = "<" + client_addr[0] + ">" + msg
 				print("Received message from " + msg)
