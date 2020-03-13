@@ -101,23 +101,27 @@ def receive_msg(client_socket, client_addr):
 				print("filename recv")
 				client_socket.send("ready for file".encode("utf-8"))
 				copy = "copy of " + filename
-				with open(copy, 'wb') as f:
-					data = client_socket.recv(4096)
-					while data:
-						data = client_socket.recv(4096)
-						print("working...")
-						f.write(data)
-					print("done")
+				remaining = int.from_bytes(client_socket.recv(4),'big')
+				f = open(copy,"wb")
+				while remaining:
+					data = client_socket.recv(min(remaining,4096))
+					remaining -= len(data)
+					f.write(data)
 				local_files[filename] = f
 				f.close()
-				print("file saved")
-				client_socket.send("File has been sent to server. Use /rf to retrieve")
+				print("File " + filename + " saved")
+				client_socket.send("File has been sent to server. Use /rf to retrieve".encode("utf-8"))
 			elif msg.split()[0] == "/rf":
 				request = client_socket.recv(4096).decode("utf-8")
-				client_socket.send(local_files.keys())
+				client_socket.send(str(local_files.keys()).encode("utf-8"))
 				filename = client_socket.recv(4096).decode("utf-8")
 				file_to_send = local_files[filename] 
-				client_socket.send(file_to_send)
+				with open("copy of " + filename,'rb') as f:
+					data = f.read()
+					dataLen = len(data)
+					client_socket.send(dataLen.to_bytes(4,'big'))
+					client_socket.send(data)
+					print("Sending...")
 			elif msg.split()[0].lower() == "help":
 				msg = "<" + client_addr[0] + "> asked for help"
 				print(msg)

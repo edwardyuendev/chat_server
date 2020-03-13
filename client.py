@@ -9,34 +9,37 @@ import pickle
 def send_file(s):
 	print("Enter file name: ")
 	filename = input()
-	print("f")
 	s.send(filename.encode("utf-8"))
-	print("f")
 	ready = s.recv(4096).decode("utf-8")
 	try:
 		f = open(filename,'rb')
+		print("File being uploaded...")
 	except FileNotFoundError:
 		print("The requested file does not exist.")
 	####pickle cant send files
-	data = f.read(4096)
-	while data:
+
+	with open(filename,'rb') as f:
+		data = f.read()
+		dataLen = len(data)
+		s.send(dataLen.to_bytes(4,'big'))
 		s.send(data)
-		data = f.read(4096)
+		print("Sending...")
 	f.close()
 	print(s.recv(4096).decode("utf-8"))
 	
 
 def recv_file(s):
 	print("Which file do you want to download?")
-	s.send("ready for file")
-	all = s.recv(4096).decode("utf-8")
-	print(all)
-	filename= input()
-	s.send(filename)
-	f = open("copy of " + filename, 'x')
-	file_to_recv = s.recv(4096).decode("utf-8")
-	f.write(pickle.loads(file_to_recv))
-	f.close()
+	s.send("ready for file".encode("utf-8"))
+	print("Available: " +  s.recv(4096).decode("utf-8"))
+	filename = input()
+	s.send(filename.encode("utf-8"))
+	remaining = int.from_bytes(s.recv(4),'big')
+	f = open("client copy of " + filename, 'wb')
+	while remaining:
+		data = s.recv(min(remaining,4096))
+		remaining -= len(data)
+		f.write(data)
 	print("File downloaded")
 
 def encrypt_msg(msg):
