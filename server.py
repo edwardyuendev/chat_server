@@ -8,9 +8,12 @@ import string
 from lxml import html
 from googlesearch import search
 from bs4 import BeautifulSoup
+
+tran_cond = threading.Condition()
+
 def transfer_condition(): #elif msg == "/send":
-	with fileTransferCondition:
-		fileTransferCondition.notify()
+	with tran_cond:
+		tran_cond.notify()
 		
 def file_transfer(client): 
 	#client.recv(1024).decode("utf-8")
