@@ -4,38 +4,43 @@ import select
 import sys
 import threading
 
-def send_file(filename, s):
-	print("Transfering " + filename + "...")
-	try:
-		f = open(filename,'rb')
-		f.close()
-	except FileNotFoundError:
-		print("The requested file does not exist.")
-		s.send(bytes("~error~","utf-8"))
-	else:
-		s.send(bytes(filename,"utf-8"))
-		s.recv(1024)
-		print("Uploading file to server...")
-		with open(filename,'rb') as f:
-			data = f.read()
-			dataLen = len(data)
-			s.send(dataLen.to_bytes(4,'big'))
-			s.send(data)
-		print(s.recv(1024).decode("utf-8"))
+def send_file(s):
+    #msg = s.send("/ft")
+    #msg = s.recv(1024).decode("utf.8")
+    #if msg = /ftc --> continue
+    print("Please enter the filename: ")
+    filename = input()
+    try:
+        f = open(filename,'rb')
+        f.close()
+    except FileNotFoundError:
+        print("Error: File does not exist. Please try again later.")
+        s.send(bytes("no_file","utf-8"))
+        continue
+    s.send(bytes(filename,"utf-8"))
+    s.recv(1024) #/sendFile
+    print("Uploading file to server...")
+    with open(filename,'rb') as f:
+        data = f.read()
+        dataLen = len(data)
+        s.send(dataLen.to_bytes(4,'big'))
+        s.send(data)
+    print(s.recv(1024).decode("utf-8"))
 
-def recv_file(filename, s):
-	print("Receiving shared group file...")
-	s.send("/sendFilename") #encrpyt("/sendfile")
-	filename = s.recv(1024).decode("utf-8")
-	s.send("/sendFile")
-	remaining = int.from_bytes(s.recv(4),'big')
-	f = open(filename,"wb")
-	while remaining:
-		data = s.recv(min(remaining,4096))
-		remaining -= len(data)
-		f.write(data)
-	f.close()
-	print("Received file saved as",filename)
+def recv_file():
+    #s.recv(1024).decode == /receiveFile
+    print("Incoming file...")
+    s.send(b"/send")
+    filename = s.recv(1024).decode("utf-8")
+    s.send(b"/send")
+    remaining = int.from_bytes(s.recv(4),'big')
+    f = open(filename,"wb")
+    while remaining:
+        data = s.recv(min(remaining,4096))
+        remaining -= len(data)
+        f.write(data)
+    f.close()
+    print("Received: ",filename)
 
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))
