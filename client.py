@@ -7,40 +7,49 @@ import time
 import pickle
 
 def send_file(s):
-	print("Enter file name: ")
+	print("Enter file name or enter to exit: ")
 	filename = input()
-	s.send(filename.encode("utf-8"))
-	ready = s.recv(4096).decode("utf-8")
-	try:
-		f = open(filename,'rb')
-		print("File being uploaded...")
-	except FileNotFoundError:
-		print("The requested file does not exist.")
-	####pickle cant send files
+	if filename == '':
+		print("Exiting...")
+		s.send("no".encode("utf-8"))
+	else:
+		s.send(filename.encode("utf-8"))
+		ready = s.recv(4096).decode("utf-8")
+		try:
+			f = open(filename,'rb')
+			print("File being uploaded...")
+		except FileNotFoundError:
+			print("The requested file does not exist.")
+		####pickle cant send files
 
-	with open(filename,'rb') as f:
-		data = f.read()
-		dataLen = len(data)
-		s.send(dataLen.to_bytes(4,'big'))
-		s.send(data)
-		print("Sending...")
-	f.close()
+		with open(filename,'rb') as f:
+			data = f.read()
+			dataLen = len(data)
+			s.send(dataLen.to_bytes(4,'big'))
+			s.send(data)
+			print("Sending...")
+		f.close()
 	print(s.recv(4096).decode("utf-8"))
 	
 
 def recv_file(s):
-	print("Which file do you want to download?")
+	print("Which file do you want to download? Enter to exit")
 	s.send("ready for file".encode("utf-8"))
 	print("Available: " +  s.recv(4096).decode("utf-8"))
 	filename = input()
-	s.send(filename.encode("utf-8"))
-	remaining = int.from_bytes(s.recv(4),'big')
-	f = open("client copy of " + filename, 'wb')
-	while remaining:
-		data = s.recv(min(remaining,4096))
-		remaining -= len(data)
-		f.write(data)
-	print("File downloaded")
+	if filename == '':
+		print("Exiting...")
+		s.send("no".encode("utf-8"))
+	else:
+		s.send(filename.encode("utf-8"))
+		remaining = int.from_bytes(s.recv(4),'big')
+		f = open("client copy of " + filename, 'wb')
+		while remaining:
+			data = s.recv(min(remaining,4096))
+			remaining -= len(data)
+			f.write(data)
+		print("File downloaded")
+	print("/rf exited")
 
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
