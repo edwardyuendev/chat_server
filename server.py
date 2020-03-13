@@ -3,68 +3,32 @@ import socket
 import select
 import sys
 import threading
-import requests
-import string
-from lxml import html
-from googlesearch import search
-from bs4 import BeautifulSoup
+import time
+import pickle
 
-tran_cond = threading.Condition()
+def transfer_file(client_socket):
+	filename = client_socket.recv(4096)
+	client_socket.send("ready for file")
+	file_to_send = client_socket.recv(4096)
 
-def transfer_condition(): #elif msg == "/send":
-	with tran_cond:
-		tran_cond.notify()
-		
-def file_transfer(client): 
-	#client.recv(1024).decode("utf-8")
-	client.send(b"/ftc")
-	filename = client.recv(1024).decode("utf-8")
-	if filename == "no_file":
-		continue
-	client.send(b"/sendFile")
-	remaining = int.from_bytes(client.recv(4),'big')
-	f = open(filename,"wb")
-	while remaining:
-		data = client.recv(min(remaining,4096))
-		remaining -= len(data)
-		f.write(data)
-	f.close()
-	print("File received:" + filename)
 	for c in clients:
-		c.send(b"/receiveFile")
-		transfer_condition()
-		c.send(bytes(filename,"utf-8"))
-		transfer_condition()
-		with open(filename,'rb') as f:
-			data = f.read()
-			dataLen = len(data)
-			c.send(dataLen.to_bytes(4,'big'))
-			c.send(data)
-	client.send(bytes(filename + " shared.","utf-8"))
-	print("File sent" + filename)
+		if c != client_socket:
+			recv_call = c.send("/recv")
+			c.recv(4096)
+			c.send(filename)
+			c.send(file_to_send)
+	client_socket.send("Successfully shared file with everyone in the room")
+	print("File shared")
+
+
 
 def encrypt_msg(msg):
-	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))
-	return obj.encrypt(msg.encode('utf-8'))
+	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
+	return obj.encrypt(msg)
 
 def decrypt_msg(msg):
-	obj = AES.new('This is a key123'.encode('utf-8'), AES.MODE_CFB, 'This is an IV456'.encode('utf-8'))
-	return obj.decrypt(msg.encode('utf-8'))
-
-def chatbot(question):
-	answer = ''
-	text = ''
-	results = list(search(question, tld="co.in", num=10, stop=3, pause=1))
-	soup = BeautifulSoup((requests.get(results[0])).content, features="lxml")
-	for a in soup.findAll('p'):
-		text += '\n' + ''.join(a.findAll(text = True))
-	text = text.replace('\n', '')
-	text = text.split('.')
-	answer = (text[0].split('?')[0]).translate({ord(c): None for c in string.whitespace}) #https://www.journaldev.com/23763/python-remove-spaces-from-string
-	if len(answer) > 0:
-		return answer
-	else:
-		return "I do not know. Ask me something else please."
+	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
+	return obj.decrypt(msg)
 
 HEADER_LEN = 10
 IP = '127.0.0.1'
@@ -78,6 +42,8 @@ server.listen()
 print("Chat server is now listening: ")
 
 clients = []
+local_files = {}
+chatrooms = {'Global':[]}
 
 def broadcast_global(msg, conn):
 	for client_socket in clients:
@@ -89,9 +55,23 @@ def broadcast_global(msg, conn):
 				client_socket.close()
 				clients.remove(client_socket)
 
+def broadcast_to_room(msg, conn, room_name):
+	for client_socket in chatrooms[room_name]:
+		if client_socket != conn:
+			try:
+				client_socket.send(encrypt_msg(msg))
+
+			except:
+				client_socket.close()
+				clients.remove(client_socket)
+				chatrooms[room_name].remove(client_socket)
+
 def receive_msg(client_socket, client_addr):
-	welcome_msg = "Welcome to our chatroom! Enjoy chatting!"
-	client_socket.send(encrypt_msg(welcome_msg))
+	chatrooms['Global'].append((client_socket))
+	curr_room = 'Global'
+	welcome_msg = """Welcome to our chatroom! \n\n"""
+	help_msg = """Here are a few things you can do: \n1) Type '/mc Edward's Chatroom to create your own chatroom called 'Edward's Chatroom' \n2) Type '/jc Stocks' to join the 'Stocks' chatroom if you know it exists\n3) Type 'Help' at anytime to see these tips again! :) \n \nYou are currently in the chatroom '{0}', you can start sending messages now! \n""".format(curr_room)
+	client_socket.send(encrypt_msg(welcome_msg+help_msg))
 
 	while True:
 		try:
@@ -99,23 +79,58 @@ def receive_msg(client_socket, client_addr):
 			message = client_socket.recv(2048)
 			msg = decrypt_msg(message).decode()
 
-			if len(msg) > 0:
+			if msg.split()[0] == "/mc":
+				new_room = ' '.join(msg.split()[1:])
+				chatrooms[new_room] = [client_socket]
+				chatrooms[curr_room].remove(client_socket)
+				msg = "<" + client_addr[0] + "> " + """has left chatroom '""" + str(curr_room) + """' and CREATED chatroom """ + """'""" + str(new_room) + """'!"""
+				print(msg)
+				curr_room = new_room
+				client_socket.send(encrypt_msg("You have created & joined the room called" + """'""" + new_room + """'"""))
+			elif msg.split()[0] == "/jc":
+				new_room = ' '.join(msg.split()[1:])
+				chatrooms[curr_room].remove(client_socket)
+				chatrooms[new_room].append(client_socket)
+				msg = "<" + client_addr[0] + "> " + """has left chatroom '""" + str(curr_room) + """' and JOINED chatroom """ + """'""" + str(new_room) + """'!"""
+				print(msg)
+				client_socket.send(encrypt_msg("""You have left chatroom '""" + str(curr_room) + """' and JOINED chatroom """ + """'""" + str(new_room) + """'!"""))								
+				curr_room = new_room
+			elif msg.split()[0] == "/ft":
+				print("/ft command called")
+				filename = client_socket.recv(4096).decode("utf-8")
+				print("filename recv")
+				client_socket.send("ready for file".encode("utf-8"))
+				copy = "copy of " + filename
+				with open(copy, 'wb') as f:
+					data = client_socket.recv(4096)
+					while data:
+						data = client_socket.recv(4096)
+						print("working...")
+						f.write(data)
+					print("done")
+				local_files[filename] = f
+				f.close()
+				print("file saved")
+				client_socket.send("File has been sent to server. Use /rf to retrieve")
+			elif msg.split()[0] == "/rf":
+				request = client_socket.recv(4096).decode("utf-8")
+				client_socket.send(local_files.keys())
+				filename = client_socket.recv(4096).decode("utf-8")
+				file_to_send = local_files[filename] 
+				client_socket.send(file_to_send)
+			elif msg.split()[0].lower() == "help":
+				msg = "<" + client_addr[0] + "> asked for help"
+				print(msg)
+				client_socket.send(encrypt_msg(help_msg))
+			elif len(msg) > 0:
 				msg = "<" + client_addr[0] + ">" + msg
 				print("Received message from " + msg)
-				broadcast_global(msg, client_socket)
+				broadcast_to_room(msg, client_socket, curr_room)
 			else:
 				clients.remove(client_socket)
 
 		except:
 			continue
-
-		# if msg == "/filetransfer":
-		# 	message = client_socket.recv(2048)
-		# 	recv_file(filename, client_socket)
-		# 	for c in clients
-		# 		send_file(filename, c)
-
-
 
 while True:
 	client_socket, client_addr = server.accept()
