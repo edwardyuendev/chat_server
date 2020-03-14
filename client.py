@@ -3,26 +3,52 @@ import socket
 import select
 import sys
 import threading
+import time
+import pickle
 
-def send_file(filename, s):
-	try:
-		f = open(filename,'rb')
+def send_file(s):
+	print("Enter file name or enter to exit: ")
+	filename = input()
+	if filename == '':
+		print("Exiting...")
+		s.send("no".encode("utf-8"))
+	else:
+		s.send(filename.encode("utf-8"))
+		ready = s.recv(4096).decode("utf-8")
+		try:
+			f = open(filename,'rb')
+			print("File being uploaded...")
+		except FileNotFoundError:
+			print("The requested file does not exist.")
+		####pickle cant send files
+
+		with open(filename,'rb') as f:
+			data = f.read()
+			dataLen = len(data)
+			s.send(dataLen.to_bytes(4,'big'))
+			s.send(data)
+			print("Sending...")
 		f.close()
-	except FileNotFoundError:
-		print("The requested file does not exist.")
-		
-	with open(str(filename), 'rb') as sendingFile:
-		packet = sendingFile.read(1024)
-		while (packet):
-			s.send(packet)
-			packet = f.read(1024)
+	print(s.recv(4096).decode("utf-8"))
 
-def recv_file(filename, s):
-	with open(str(filename), 'wb') as f:
-		while True:
-			packet = s.recv(1024)
-			while (packet):
-				f.write(data)
+def recv_file(s):
+	print("Which file do you want to download? Enter to exit")
+	s.send("ready for file".encode("utf-8"))
+	print("Available: " +  s.recv(4096).decode("utf-8"))
+	filename = input()
+	if filename == '':
+		print("Exiting...")
+		s.send("no".encode("utf-8"))
+	else:
+		s.send(filename.encode("utf-8"))
+		remaining = int.from_bytes(s.recv(4),'big')
+		f = open("client copy of " + filename, 'wb')
+		while remaining:
+			data = s.recv(min(remaining,4096))
+			remaining -= len(data)
+			f.write(data)
+		print("File downloaded")
+	print("/rf exited")
 
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
@@ -53,7 +79,7 @@ while True:
 	read_sockets, write_sockets, exception_sockets = select.select(sockets_list, [], sockets_list)
 	for read in read_sockets:
 		if read == server:
-			message = read.recv(2048)
+			message = read.recv(2048)			
 			print(decrypt_msg(message).decode())
 		else:
 			message = sys.stdin.readline()
@@ -62,5 +88,11 @@ while True:
 			sys.stdout.write("<You>")
 			sys.stdout.write(message)
 			sys.stdout.flush()
+			if message.split()[0] == '/ft':
+				send_file(server)
+			if message.split()[0] == "/rf":
+				recv_file(server)
+
+			
 
 server.close()

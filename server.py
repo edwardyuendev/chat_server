@@ -4,27 +4,6 @@ import select
 import sys
 import threading
 
-def send_file(filename, s):
-	try:
-		f = open(filename,'rb')
-		f.close()
-	except FileNotFoundError:
-		print("The requested file does not exist.")
-
-	#for user in client:
-	with open(str(filename), 'rb') as sendingFile:
-		packet = sendingFile.read(1024)
-		while (packet):
-			s.send(packet) #user.send(packet)
-			packet = f.read(1024)
-
-def recv_file(filename, s):
-	with open(str(filename), 'wb') as f:
-		while True:
-			packet = s.recv(1024)
-			while (packet):
-				f.write(data)
-
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
 	return obj.encrypt(msg)
@@ -45,7 +24,9 @@ server.listen()
 print("Chat server is now listening: ")
 
 clients = []
-chatrooms = {'Global':[]}
+local_files = {}
+chatrooms = {'Global':[]} 
+files_per_room = { 'Global' : {} }
 
 def broadcast_global(msg, conn):
 	for client_socket in clients:
@@ -88,6 +69,7 @@ def receive_msg(client_socket, client_addr):
 				msg = "<" + client_addr[0] + "> " + """has left chatroom '""" + str(curr_room) + """' and CREATED chatroom """ + """'""" + str(new_room) + """'!"""
 				print(msg)
 				curr_room = new_room
+				files_per_room[str(curr_room)] = {}
 				client_socket.send(encrypt_msg("You have created & joined the room called" + """'""" + new_room + """'"""))
 			elif msg.split()[0] == "/jc":
 				new_room = ' '.join(msg.split()[1:])
@@ -97,11 +79,49 @@ def receive_msg(client_socket, client_addr):
 				print(msg)
 				client_socket.send(encrypt_msg("""You have left chatroom '""" + str(curr_room) + """' and JOINED chatroom """ + """'""" + str(new_room) + """'!"""))								
 				curr_room = new_room
+			elif msg.split()[0] == "/ft":
+				print("/ft command called")
+				filename = client_socket.recv(4096).decode("utf-8")
+				if filename == "no":
+					client_socket.send("/ft exited".encode("utf-8"))
+				else:
+					print("filename recv")
+					client_socket.send("ready for file".encode("utf-8"))
+					copy = "copy of " + filename
+					remaining = int.from_bytes(client_socket.recv(4),'big')
+					f = open(copy,"wb")
+					while remaining:
+						data = client_socket.recv(min(remaining,4096))
+						remaining -= len(data)
+						f.write(data)
+					files_per_room[str(curr_room)][filename] = f
+					f.close()
+					print("File " + filename + " saved")
+					client_socket.send("File has been sent to server. Use /rf to retrieve".encode("utf-8"))
+			elif msg.split()[0] == "/rf":
+				print("/rf protocol started")
+				request = client_socket.recv(4096).decode("utf-8")
+				print(not bool(files_per_room[str(curr_room)]))
+				if not files_per_room[str(curr_room)]:
+					client_socket.send("No files. Press enter to exit".encode("utf-8"))
+				else:
+					client_socket.send(str(files_per_room[str(curr_room)].keys()).encode("utf-8"))
+				filename = client_socket.recv(4096).decode("utf-8")
+				if filename != "no": 
+					file_to_send = files_per_room[str(curr_room)][filename]
+					with open("copy of " + filename,'rb') as f:
+						data = f.read()
+						dataLen = len(data)
+						client_socket.send(dataLen.to_bytes(4,'big'))
+						client_socket.send(data)
+						print("Sending...")
+					f.close()
+					print("File transfered")
+				print("/rf protocol terminated")
 			elif msg.split()[0].lower() == "help":
 				msg = "<" + client_addr[0] + "> asked for help"
 				print(msg)
 				client_socket.send(encrypt_msg(help_msg))
-
 			elif len(msg) > 0:
 				msg = "<" + client_addr[0] + ">" + msg
 				print("Received message from " + msg)
