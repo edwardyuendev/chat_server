@@ -3,8 +3,26 @@ import socket
 import select
 import sys
 import threading
-import time
-import pickle
+from bs4 import BeautifulSoup
+import requests
+import string
+from googlesearch import search
+from lxml import html
+
+def chatbot(question):
+	text = ''
+	results = list(search(question, tld="com", num=1, stop=1, pause=1))
+	bs = BeautifulSoup((requests.get(results[0])).content, features="lxml").findAll('p')
+	for a in bs:
+		text += '\n' + ''.join(a.findAll(text = True))
+	text = text.replace('\n', '')
+	line = text.split('.')
+	answer = line[0].split('?')[0] 
+	parse = answer.translate({ord(c): None for c in string.whitespace}) #https://www.journaldev.com/23763/python-remove-spaces-from-string
+	if len(parse) > 0:
+		return answer
+	else:
+		return "Error, cannot query. Try something else."
 
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
@@ -120,6 +138,12 @@ def receive_msg(client_socket, client_addr):
 					f.close()
 					print("File transfered")
 				print("/rf protocol terminated")
+			elif msg.split()[0].lower() == "/google":
+				print("google search initiated")
+				query = ' '.join(msg.split()[1:])
+				print("searching for " + query)
+				client_socket.send(encrypt_msg("Google: " + chatbot(query)))
+				print("google search complete")
 			elif msg.split()[0].lower() == "help":
 				msg = "<" + client_addr[0] + "> asked for help"
 				print(msg)
@@ -130,7 +154,6 @@ def receive_msg(client_socket, client_addr):
 				broadcast_to_room(msg, client_socket, curr_room)
 			else:
 				clients.remove(client_socket)
-
 		except:
 			continue
 

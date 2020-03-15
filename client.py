@@ -93,7 +93,5 @@ while True:
 				send_file(server)
 			if message.split()[0] == "/rf":
 				recv_file(server)
-
-			
-
+				
 server.close()
