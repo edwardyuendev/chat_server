@@ -7,48 +7,57 @@ import time
 import pickle
 
 def send_file(s):
-	print("Enter file name or enter to exit: ")
+	print("""Type 'stop' to cancel or enter a filename to send: """, end="")
 	filename = input()
-	if filename == '':
+	if filename == 'stop':
 		print("Exiting...")
-		s.send("no".encode("utf-8"))
+		s.send(encrypt_msg("stop"))
+		print(decrypt_msg(s.recv(4096)).decode())
 	else:
-		s.send(filename.encode("utf-8"))
-		ready = s.recv(4096).decode("utf-8")
+		s.send(encrypt_msg(filename))
 		try:
 			f = open(filename,'rb')
 			print("File being uploaded...")
 		except FileNotFoundError:
 			print("The requested file does not exist.")
-		####pickle cant send files
 
 		with open(filename,'rb') as f:
 			data = f.read()
-			dataLen = len(data)
-			s.send(dataLen.to_bytes(4,'big'))
-			s.send(data)
+			s.send(len(data).to_bytes(4,'big'))
+			s.send(encrypt_msg(data))
 			print("Sending...")
+			time.sleep(0.7)
 		f.close()
-	print(s.recv(4096).decode("utf-8"))
+		print(decrypt_msg(s.recv(4096)).decode())
 
 def recv_file(s):
-	print("Which file do you want to download? Enter to exit")
-	s.send("ready for file".encode("utf-8"))
-	print("Available: " +  s.recv(4096).decode("utf-8"))
-	filename = input()
-	if filename == '':
-		print("Exiting...")
-		s.send("no".encode("utf-8"))
+	message = decrypt_msg(s.recv(4096)).decode()
+	if message.split()[0] == "Empty":
+		print("There are no uploaded files, please upload a file or wait for others to do so.")
+		return
 	else:
-		s.send(filename.encode("utf-8"))
+		print("\nHere are all files available for download:")
+		print(message)
+		print("Enter a filename to download: ", end="")
+	filename = input()
+	print("Filename: ", filename)
+	if filename.lower() == 'stop':
+		print("Exiting...")
+		s.send(encrypt_msg("stop"))
+	else:
+		s.send(encrypt_msg(filename))
+		response = decrypt_msg(s.recv(4096)).decode()
+		if response == "invalid":
+			print(filename +" is not a valid file.")
+			return
 		remaining = int.from_bytes(s.recv(4),'big')
-		f = open("client copy of " + filename, 'wb')
+		f = open("client_copy_of_" + filename, 'wb')
 		while remaining:
 			data = s.recv(min(remaining,4096))
 			remaining -= len(data)
 			f.write(data)
-		print("File downloaded")
-	print("/rf exited")
+		print("File downloaded.")
+		print("File transfer has successfully terminated.")
 
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
@@ -62,8 +71,11 @@ HEADER_LEN = 10
 IP = '127.0.0.1'
 PORT = 1236
 
+print("Please enter your name: ", end=" ")
+name = input()
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.connect((IP, PORT))
+server.send(encrypt_msg(name))
 
 while True:
 	sockets_list = [sys.stdin, server]
@@ -79,19 +91,26 @@ while True:
 	read_sockets, write_sockets, exception_sockets = select.select(sockets_list, [], sockets_list)
 	for read in read_sockets:
 		if read == server:
-			message = read.recv(2048)			
-			print(decrypt_msg(message).decode())
+			message = read.recv(4096)			
+			print(decrypt_msg(message).decode(), end="")
 		else:
 			message = sys.stdin.readline()
+			if not message.split():
+				continue
 			server.send(encrypt_msg(message))
-			#sys.stdout.flush()
-			sys.stdout.write("<You>")
+			sys.stdout.write("< You >")
 			sys.stdout.write(message)
 			sys.stdout.flush()
 			if message.split()[0] == '/ft':
 				send_file(server)
-			if message.split()[0] == "/rf":
+			elif message.split()[0] == "/rf":
 				recv_file(server)
+			elif message.split()[0] == "/mc":
+				sys.stdout.flush()
+				print(decrypt_msg(server.recv(4096)).decode())
+			elif message.split()[0] == "/jc":
+				sys.stdout.flush()
+				print(decrypt_msg(server.recv(4096)).decode())
 
 			
 

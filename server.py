@@ -3,7 +3,7 @@ import socket
 import select
 import sys
 import threading
-
+import time
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
 	return obj.encrypt(msg)
@@ -52,62 +52,97 @@ def broadcast_to_room(msg, conn, room_name):
 def receive_msg(client_socket, client_addr):
 	chatrooms['Global'].append((client_socket))
 	curr_room = 'Global'
-	welcome_msg = """Welcome to our chatroom! \n\n"""
-	help_msg = """Here are a few things you can do: \n1) Type '/mc Edward's Chatroom to create your own chatroom called 'Edward's Chatroom' \n2) Type '/jc Stocks' to join the 'Stocks' chatroom if you know it exists\n3) Type 'Help' at anytime to see these tips again! :) \n \nYou are currently in the chatroom '{0}', you can start sending messages now! \n""".format(curr_room)
+	#request_name = "Please enter your name: "
+	#client_socket.send(encrypt_msg(request_name))
+	name = decrypt_msg(client_socket.recv(4096)).decode()	
+	welcome_msg = "Hi " + name +  """! Welcome to our chatroom! \n\n"""
+	help_msg = """Here are a few things you can do: \n1) Type '/mc abc' to create & join your own chatroom named 'abc'. \n2) Type '/jc efg' to join the 'efg' chatroom if you know it exists.\n3) Type 'chatrooms' to see all available chatrooms to join.\n4) Type '/ft' to initiate a file transfer to the server.\n5) Type '/rf' to download a file from the server\n6) Type 'help' at anytime to see these tips again! :) \n \nYou are currently in the chatroom '{0}', you can start sending messages now! \n""".format(curr_room)
+	time.sleep(0.5)
 	client_socket.send(encrypt_msg(welcome_msg+help_msg))
 
 	while True:
+		help_msg = """Here are a few things you can do: \n1) Type '/mc abc' to create & join your own chatroom named 'abc'. \n2) Type '/jc efg' to join the 'efg' chatroom if you know it exists.\n3) Type 'chatrooms' to see all available chatrooms to join.\n4) Type 'help' at anytime to see these tips again! :) \n \nYou are currently in the chatroom '{0}', you can start sending messages now! \n""".format(curr_room)		
 		try:
-			#print("waiting for message")
-			message = client_socket.recv(2048)
+			message = client_socket.recv(4096)
 			msg = decrypt_msg(message).decode()
 
 			if msg.split()[0] == "/mc":
 				new_room = ' '.join(msg.split()[1:])
 				chatrooms[new_room] = [client_socket]
 				chatrooms[curr_room].remove(client_socket)
-				msg = "<" + client_addr[0] + "> " + """has left chatroom '""" + str(curr_room) + """' and CREATED chatroom """ + """'""" + str(new_room) + """'!"""
+				msg = "< " + name + " > " + """has left chatroom '""" + str(curr_room) + """' and CREATED chatroom """ + """'""" + str(new_room) + """'!"""
 				print(msg)
 				curr_room = new_room
 				files_per_room[str(curr_room)] = {}
-				client_socket.send(encrypt_msg("You have created & joined the room called" + """'""" + new_room + """'"""))
+				client_socket.send(encrypt_msg("You have created & joined the room called " + """'""" + new_room + """'"""))
 			elif msg.split()[0] == "/jc":
 				new_room = ' '.join(msg.split()[1:])
+				if new_room not in chatrooms:
+					client_socket.send(encrypt_msg(new_room + " is not a valid chatroom. Type 'chatrooms' to see all available chatrooms or create a new one!"))
+					print("< " + name + " > failed to join a chatroom")
+					continue
 				chatrooms[curr_room].remove(client_socket)
 				chatrooms[new_room].append(client_socket)
-				msg = "<" + client_addr[0] + "> " + """has left chatroom '""" + str(curr_room) + """' and JOINED chatroom """ + """'""" + str(new_room) + """'!"""
+				msg = "< " + name + " > " + """has left chatroom '""" + str(curr_room) + """' and JOINED chatroom """ + """'""" + str(new_room) + """'!"""
 				print(msg)
 				client_socket.send(encrypt_msg("""You have left chatroom '""" + str(curr_room) + """' and JOINED chatroom """ + """'""" + str(new_room) + """'!"""))								
 				curr_room = new_room
+			elif msg.split()[0] == "chatrooms":
+				response = "\nHere are all of the chatrooms that you can join:\n"
+				for key in chatrooms.keys():
+					response += key
+					response += "\n"
+				response += """\nType '/jc hij' to join the chatroom called 'hij'.\n"""
+				client_socket.send(encrypt_msg(response))
+			elif msg.split()[0] == "files":
+				response = "\nHere are all of the files that you can download:\n"
+				for key in files_per_room[curr_room].keys():
+					response += key
+					response += "\n"
+				response += "\n"
+				client_socket.send(encrypt_msg(response))
 			elif msg.split()[0] == "/ft":
-				print("/ft command called")
-				filename = client_socket.recv(4096).decode("utf-8")
-				if filename == "no":
-					client_socket.send("/ft exited".encode("utf-8"))
+				msg = "<" + name + "> has initiated file transfer."
+				print(msg)
+				filename = decrypt_msg(client_socket.recv(4096)).decode()
+				if filename == "stop":
+					msg = "<" + name + "> has stopped file transfer."
+					print(msg)
+					client_socket.send(encrypt_msg("File transfer has halted."))
 				else:
-					print("filename recv")
-					client_socket.send("ready for file".encode("utf-8"))
-					copy = "copy of " + filename
+					copy = "server_copy_of_" + filename
 					remaining = int.from_bytes(client_socket.recv(4),'big')
+					print("filename received")
 					f = open(copy,"wb")
 					while remaining:
-						data = client_socket.recv(min(remaining,4096))
+						data = decrypt_msg(client_socket.recv(min(remaining,4096)))
 						remaining -= len(data)
 						f.write(data)
 					files_per_room[str(curr_room)][filename] = f
 					f.close()
 					print("File " + filename + " saved")
-					client_socket.send("File has been sent to server. Use /rf to retrieve".encode("utf-8"))
+					response = """The file '""" + filename + """' has been succesfully uploaded to the server! \nUse /rf to download any files from the server!"""
+					client_socket.send(encrypt_msg(response))
 			elif msg.split()[0] == "/rf":
 				print("/rf protocol started")
-				request = client_socket.recv(4096).decode("utf-8")
-				print(not bool(files_per_room[str(curr_room)]))
 				if not files_per_room[str(curr_room)]:
-					client_socket.send("No files. Press enter to exit".encode("utf-8"))
+					print("No rooms in this server")
+					client_socket.send(encrypt_msg("Empty"))
+					continue
 				else:
-					client_socket.send(str(files_per_room[str(curr_room)].keys()).encode("utf-8"))
-				filename = client_socket.recv(4096).decode("utf-8")
-				if filename != "no": 
+					response = ""
+					for key in files_per_room[curr_room].keys():
+						response += key
+						response += "\n"
+					client_socket.send(encrypt_msg(response))
+				filename = decrypt_msg(client_socket.recv(4096)).decode()
+				if filename not in files_per_room[str(curr_room)]:
+					print(name + " requested to download an invalid file")
+					client_socket.send(encrypt_msg("invalid"))
+					continue
+				client_socket.send(encrypt_msg("valid"))
+				print("Sending file with filename: ", filename)
+				if filename != "stop": 
 					file_to_send = files_per_room[str(curr_room)][filename]
 					with open("copy of " + filename,'rb') as f:
 						data = f.read()
@@ -119,11 +154,11 @@ def receive_msg(client_socket, client_addr):
 					print("File transfered")
 				print("/rf protocol terminated")
 			elif msg.split()[0].lower() == "help":
-				msg = "<" + client_addr[0] + "> asked for help"
+				msg = "< " + name + " > asked for help"
 				print(msg)
-				client_socket.send(encrypt_msg(help_msg))
+				client_socket.send(encrypt_msg("\n"+help_msg))
 			elif len(msg) > 0:
-				msg = "<" + client_addr[0] + ">" + msg
+				msg = "< " + name + " > " + msg
 				print("Received message from " + msg)
 				broadcast_to_room(msg, client_socket, curr_room)
 			else:
