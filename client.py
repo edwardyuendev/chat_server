@@ -14,12 +14,14 @@ def send_file(s):
 		s.send(encrypt_msg("stop"))
 		print(decrypt_msg(s.recv(4096)).decode())
 	else:
-		s.send(encrypt_msg(filename))
 		try:
 			f = open(filename,'rb')
-			print("File being uploaded...")
+			print("File is being uploaded...")
 		except FileNotFoundError:
-			print("The requested file does not exist.")
+			print("The requested file does not exist. File transfer has been terminated!")
+			s.send(encrypt_msg("stop"))
+			return		
+		s.send(encrypt_msg(filename))
 
 		with open(filename,'rb') as f:
 			data = f.read()
@@ -40,7 +42,9 @@ def recv_file(s):
 		print(message)
 		print("Enter a filename to download: ", end="")
 	filename = input()
-	print("Filename: ", filename)
+	if filename == "":
+		print("Not a valid file, file transfer terminated")
+		return
 	if filename.lower() == 'stop':
 		print("Exiting...")
 		s.send(encrypt_msg("stop"))

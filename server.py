@@ -158,7 +158,9 @@ def receive_msg(client_socket, client_addr):
 						response += "\n"
 					client_socket.send(encrypt_msg(response))
 				filename = decrypt_msg(client_socket.recv(4096)).decode()
-				if filename not in files_per_room[str(curr_room)]:
+				if filename == "stop":
+					continue
+				if filename not in files_per_room[str(curr_room)] or filename == "":
 					print(name + " requested to download an invalid file")
 					client_socket.send(encrypt_msg("invalid"))
 					continue
@@ -166,7 +168,7 @@ def receive_msg(client_socket, client_addr):
 				print("Sending file with filename: ", filename)
 				if filename != "stop": 
 					file_to_send = files_per_room[str(curr_room)][filename]
-					with open("copy of " + filename,'rb') as f:
+					with open("server_copy_of_" + filename,'rb') as f:
 						data = f.read()
 						dataLen = len(data)
 						client_socket.send(dataLen.to_bytes(4,'big'))
