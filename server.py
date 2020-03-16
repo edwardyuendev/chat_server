@@ -4,6 +4,28 @@ import select
 import sys
 import threading
 import time
+from bs4 import BeautifulSoup
+import requests
+import string
+from googlesearch import search
+from lxml import html
+
+def chatbot(question):
+	text = ''
+	results = list(search(question, tld="com", num=1, stop=1, pause=1))
+	bs = BeautifulSoup((requests.get(results[0])).content, features="lxml").findAll('p')
+	for a in bs:
+		text += '\n' + ''.join(a.findAll(text = True))
+	text = text.replace('\n', '')
+	line = text.split('.')
+	answer = line[0].split('?')[0] 
+	parse = answer.translate({ord(c): None for c in string.whitespace}) #https://www.journaldev.com/23763/python-remove-spaces-from-string
+	answer += "\n"
+	if len(parse) > 0:
+		return answer
+	else:
+		return "Error, cannot query. Try something else."
+
 def encrypt_msg(msg):
 	obj = AES.new('This is a key123', AES.MODE_CFB, 'This is an IV456')
 	return obj.encrypt(msg)
@@ -56,7 +78,7 @@ def receive_msg(client_socket, client_addr):
 	#client_socket.send(encrypt_msg(request_name))
 	name = decrypt_msg(client_socket.recv(4096)).decode()	
 	welcome_msg = "Hi " + name +  """! Welcome to our chatroom! \n\n"""
-	help_msg = """Here are a few things you can do: \n1) Type '/mc abc' to create & join your own chatroom named 'abc'. \n2) Type '/jc efg' to join the 'efg' chatroom if you know it exists.\n3) Type 'chatrooms' to see all available chatrooms to join.\n4) Type '/ft' to initiate a file transfer to the server.\n5) Type '/rf' to download a file from the server\n6) Type 'help' at anytime to see these tips again! :) \n \nYou are currently in the chatroom '{0}', you can start sending messages now! \n""".format(curr_room)
+	help_msg = """Here are a few things you can do: \n1) Type '/mc abc' to create & join your own chatroom named 'abc'. \n2) Type '/jc efg' to join the 'efg' chatroom if you know it exists.\n3) Type 'chatrooms' to see all available chatrooms to join.\n4) Type '/ft' to initiate a file transfer to the server.\n5) Type '/rf' to download a file from the server\n6) Type '/google Who is Kevin Durant?' to ask Google who Kevin Durant is! \n7) Type 'help' at anytime to see these tips again! :) \n \nYou are currently in the chatroom '{0}', you can start sending messages now! \n""".format(curr_room)
 	time.sleep(0.5)
 	client_socket.send(encrypt_msg(welcome_msg+help_msg))
 
@@ -157,6 +179,13 @@ def receive_msg(client_socket, client_addr):
 				msg = "< " + name + " > asked for help"
 				print(msg)
 				client_socket.send(encrypt_msg("\n"+help_msg))
+			elif msg.split()[0].lower() == "/google":
+				print(name + " initiated a google search.")
+				query = ' '.join(msg.split()[1:])
+				client_socket.send(encrypt_msg("Searching now...\n"))
+				time.sleep(.5)
+				client_socket.send(encrypt_msg("Google: " + chatbot(query)))
+				print("google search complete")				
 			elif len(msg) > 0:
 				msg = "< " + name + " > " + msg
 				print("Received message from " + msg)
