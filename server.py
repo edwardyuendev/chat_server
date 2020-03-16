@@ -159,6 +159,8 @@ def receive_msg(client_socket, client_addr):
 					client_socket.send(encrypt_msg(response))
 				filename = decrypt_msg(client_socket.recv(4096)).decode()
 				if filename == "stop":
+					msg = "<" + name +"> has stopped file transfer."
+					print(msg)
 					continue
 				if filename not in files_per_room[str(curr_room)] or filename == "":
 					print(name + " requested to download an invalid file")

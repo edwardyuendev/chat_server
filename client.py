@@ -44,6 +44,7 @@ def recv_file(s):
 	filename = input()
 	if filename == "":
 		print("Not a valid file, file transfer terminated")
+		s.send(encrypt_msg("stop"))
 		return
 	if filename.lower() == 'stop':
 		print("Exiting...")
